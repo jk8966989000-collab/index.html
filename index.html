@@ -2,30 +2,31 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>打卡群管理</title>
 <style>
-  body { font-family: Arial, sans-serif; padding: 20px; background: #f4f4f4; }
-  h1 { text-align:center; cursor:text; }
-  table { width: 100%; border-collapse: collapse; background: #fff; margin-top: 10px; }
-  th, td { border: 1px solid #ccc; padding: 10px; text-align: center; }
+  body { font-family: sans-serif; padding: 20px; background: #f0f0f0; }
+  input { width: 100%; box-sizing: border-box; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th, td { border: 1px solid #999; padding: 8px; text-align: center; }
   th { background: #eee; }
-  input[type="text"], input[type="number"] { width: 100%; box-sizing: border-box; }
-  button { padding: 10px 20px; margin: 10px 5px 10px 0; }
-  .draggable { cursor: move; }
+  button { margin: 5px 5px 5px 0; padding: 6px 12px; }
+  .dragging { background: #ffd; }
 </style>
 </head>
 <body>
 
-<h1 contenteditable="true" id="editableTitle">打卡群管理</h1>
+<h2 contenteditable="true" id="title">打卡群管理</h2>
 
-<button id="incrementBtn">今日+1</button>
-<button onclick="copyTable()">複製表格</button>
-<button onclick="addRow()">新增成員</button>
+<button id="addBtn">新增成員</button>
+<button id="incrementBtn">+1</button>
+<button id="resetBtn">重置+1</button>
+<button id="copyBtn">複製表格</button>
 
 <table id="memberTable">
   <thead>
     <tr>
-      <th>編號</th>
+      <th>#</th>
       <th>名字</th>
       <th>天數</th>
       <th>備註</th>
@@ -34,163 +35,154 @@
       <th>貢獻</th>
     </tr>
   </thead>
-  <tbody>
-  </tbody>
+  <tbody></tbody>
 </table>
 
 <script>
 const table = document.getElementById('memberTable').getElementsByTagName('tbody')[0];
+const addBtn = document.getElementById('addBtn');
 const incrementBtn = document.getElementById('incrementBtn');
-const title = document.getElementById('editableTitle');
+const resetBtn = document.getElementById('resetBtn');
+const copyBtn = document.getElementById('copyBtn');
+const title = document.getElementById('title');
 
+let members = JSON.parse(localStorage.getItem('members') || '[]');
 let lastIncrement = localStorage.getItem('lastIncrement') || '';
 
-// 初始化 LocalStorage
-let members = JSON.parse(localStorage.getItem('members') || '[]');
-let savedTitle = localStorage.getItem('title');
-if(savedTitle) title.textContent = savedTitle;
-
-// 讀取儲存的成員
-function loadMembers(){
-  table.innerHTML = '';
-  members.forEach(member => {
-    const row = table.insertRow();
-    row.className = 'draggable';
-    row.innerHTML = `
-      <td><input type="number" value="${member.id}" style="width:50px;"></td>
-      <td><input type="text" value="${member.name}" oninput="saveMembers()"></td>
-      <td><input type="number" value="${member.days}" oninput="saveMembers()"></td>
-      <td><input type="text" value="${member.note}" oninput="saveMembers()"></td>
-      <td><input type="number" value="${member.donation}" onchange="updateContribution(this)"></td>
-      <td><input type="number" value="${member.activity}" onchange="updateContribution(this)"></td>
-      <td><input type="number" value="${member.contribution}" readonly></td>
-    `;
-  });
-  makeDraggable();
-}
-loadMembers();
-
-// 儲存成員到 LocalStorage
 function saveMembers(){
-  const rows = table.rows;
-  members = [];
-  for(let i=0;i<rows.length;i++){
-    const row = rows[i];
-    const id = parseInt(row.cells[0].getElementsByTagName('input')[0].value);
-    const name = row.cells[1].getElementsByTagName('input')[0].value;
-    const days = parseInt(row.cells[2].getElementsByTagName('input')[0].value || 0);
-    const note = row.cells[3].getElementsByTagName('input')[0].value;
-    const donation = parseInt(row.cells[4].getElementsByTagName('input')[0].value || 0);
-    const activity = parseInt(row.cells[5].getElementsByTagName('input')[0].value || 0);
-    const contribution = donation + activity;
-    row.cells[6].getElementsByTagName('input')[0].value = contribution;
-    members.push({id,name,days,note,donation,activity,contribution});
-  }
   localStorage.setItem('members', JSON.stringify(members));
+  localStorage.setItem('lastIncrement', lastIncrement);
 }
 
-// 編號自動更新
-function updateIndexes(){
-  const rows = table.rows;
-  for(let i=0;i<rows.length;i++){
-    rows[i].cells[0].getElementsByTagName('input')[0].value = i+1;
-  }
-  saveMembers();
-}
+function renderTable(){
+  table.innerHTML = '';
+  members.forEach((m, idx)=>{
+    const row = table.insertRow();
+    row.setAttribute('draggable', true);
+    
+    // 編號
+    const cellNum = row.insertCell();
+    const numInput = document.createElement('input');
+    numInput.value = idx + 1;
+    numInput.addEventListener('input',()=>{m.num=numInput.value; saveMembers();});
+    cellNum.appendChild(numInput);
 
-// 拖曳功能
-function makeDraggable() {
-  let dragSrcEl = null;
-  const rows = table.querySelectorAll('tr.draggable');
-  rows.forEach(row => {
-    row.draggable = true;
-    row.addEventListener('dragstart', function(e){
-      dragSrcEl = this;
-      e.dataTransfer.effectAllowed = 'move';
+    // 名字
+    const cellName = row.insertCell();
+    const nameInput = document.createElement('input');
+    nameInput.value = m.name;
+    nameInput.addEventListener('input',()=>{m.name=nameInput.value; saveMembers();});
+    cellName.appendChild(nameInput);
+
+    // 天數
+    const cellDays = row.insertCell();
+    const daysInput = document.createElement('input');
+    daysInput.type='number';
+    daysInput.value=m.days;
+    daysInput.addEventListener('input',()=>{m.days=parseInt(daysInput.value)||0; saveMembers();});
+    cellDays.appendChild(daysInput);
+
+    // 備註
+    const cellNote = row.insertCell();
+    const noteInput = document.createElement('input');
+    noteInput.value=m.note;
+    noteInput.addEventListener('input',()=>{m.note=noteInput.value; saveMembers();});
+    cellNote.appendChild(noteInput);
+
+    // 捐獻
+    const cellDonate = row.insertCell();
+    const donateInput = document.createElement('input');
+    donateInput.type='number';
+    donateInput.value=m.donate || 0;
+    donateInput.addEventListener('input',()=>{
+      m.donate=parseInt(donateInput.value)||0;
+      m.contribute=(m.donate||0)+(m.active||0);
+      contributeInput.value=m.contribute;
+      saveMembers();
     });
-    row.addEventListener('dragover', function(e){
-      e.preventDefault();
+    cellDonate.appendChild(donateInput);
+
+    // 活躍
+    const cellActive = row.insertCell();
+    const activeInput = document.createElement('input');
+    activeInput.type='number';
+    activeInput.value=m.active || 0;
+    activeInput.addEventListener('input',()=>{
+      m.active=parseInt(activeInput.value)||0;
+      m.contribute=(m.donate||0)+(m.active||0);
+      contributeInput.value=m.contribute;
+      saveMembers();
     });
-    row.addEventListener('drop', function(e){
-      e.preventDefault();
-      if(dragSrcEl !== this){
-        const parent = dragSrcEl.parentNode;
-        parent.insertBefore(dragSrcEl, this.nextSibling);
-        updateIndexes();
-      }
-    });
+    cellActive.appendChild(activeInput);
+
+    // 貢獻
+    const cellContribute = row.insertCell();
+    const contributeInput = document.createElement('input');
+    contributeInput.readOnly = true;
+    contributeInput.value=m.contribute || 0;
+    cellContribute.appendChild(contributeInput);
+
+    // 拖曳事件
+    row.addEventListener('dragstart',(e)=>{row.classList.add('dragging'); e.dataTransfer.effectAllowed='move';});
+    row.addEventListener('dragend',(e)=>{row.classList.remove('dragging'); members=[]; Array.from(table.rows).forEach(r=>{
+      const idx=parseInt(r.cells[0].getElementsByTagName('input')[0].value)||0;
+      const name=r.cells[1].getElementsByTagName('input')[0].value;
+      const days=parseInt(r.cells[2].getElementsByTagName('input')[0].value)||0;
+      const note=r.cells[3].getElementsByTagName('input')[0].value;
+      const donate=parseInt(r.cells[4].getElementsByTagName('input')[0].value)||0;
+      const active=parseInt(r.cells[5].getElementsByTagName('input')[0].value)||0;
+      const contribute=parseInt(r.cells[6].getElementsByTagName('input')[0].value)||0;
+      members.push({num:idx,name,days,note,donate,active,contribute});
+    }); saveMembers(); renderTable();});
+    row.addEventListener('dragover',(e)=>{e.preventDefault(); const draggingRow=document.querySelector('.dragging'); if(draggingRow && row!==draggingRow){
+      table.insertBefore(draggingRow,row.nextSibling);
+    }});
   });
 }
 
-// 新增成員
-function addRow() {
-  const row = table.insertRow();
-  row.className = 'draggable';
-  const idx = table.rows.length;
-  row.innerHTML = `
-    <td><input type="number" value="${idx}" style="width:50px;"></td>
-    <td><input type="text" value="" oninput="saveMembers()"></td>
-    <td><input type="number" value="1" oninput="saveMembers()"></td>
-    <td><input type="text" value="" oninput="saveMembers()"></td>
-    <td><input type="number" value="0" onchange="updateContribution(this)"></td>
-    <td><input type="number" value="0" onchange="updateContribution(this)"></td>
-    <td><input type="number" value="0" readonly></td>
-  `;
-  makeDraggable();
+addBtn.addEventListener('click',()=>{
+  const newMember = {num:members.length+1,name:'',days:0,note:'',donate:0,active:0,contribute:0};
+  members.push(newMember);
   saveMembers();
-}
+  renderTable();
+});
 
-// 更新貢獻
-function updateContribution(el) {
-  const row = el.parentNode.parentNode;
-  const donation = parseInt(row.cells[4].getElementsByTagName('input')[0].value || 0);
-  const activity = parseInt(row.cells[5].getElementsByTagName('input')[0].value || 0);
-  row.cells[6].getElementsByTagName('input')[0].value = donation + activity;
+// +1 按鈕
+incrementBtn.addEventListener('click',()=>{
+  const today = new Date().toISOString().slice(0,10);
+  if(lastIncrement===today) return;
+  members.forEach(m=>{ m.days=(m.days||0)+1; });
+  lastIncrement=today;
+  incrementBtn.disabled=true;
   saveMembers();
-}
+  renderTable();
+});
+
+// 重置+1
+resetBtn.addEventListener('click',()=>{
+  const today = new Date().toISOString().slice(0,10);
+  if(lastIncrement!==today) return; // 沒有今天+1的動作
+  members.forEach(m=>{
+    if(m.days>0) m.days-=1;
+  });
+  incrementBtn.disabled=false;
+  lastIncrement='';
+  saveMembers();
+  renderTable();
+});
 
 // 複製表格
-function copyTable() {
-  const range = document.createRange();
-  range.selectNode(table);
-  window.getSelection().removeAllRanges();
-  window.getSelection().addRange(range);
-  document.execCommand('copy');
-  window.getSelection().removeAllRanges();
-  alert('表格已複製！');
-}
-
-// 今日+1按鈕
-function checkButton() {
-  const today = new Date().toISOString().slice(0,10);
-  if(lastIncrement === today) incrementBtn.disabled = true;
-}
-checkButton();
-
-incrementBtn.addEventListener('click', () => {
-  const rows = table.rows;
-  for(let i=0;i<rows.length;i++){
-    const daysCell = rows[i].cells[2].getElementsByTagName('input')[0];
-    daysCell.value = parseInt(daysCell.value || 0) + 1;
-  }
-  lastIncrement = new Date().toISOString().slice(0,10);
-  localStorage.setItem('lastIncrement', lastIncrement);
-  incrementBtn.disabled = true;
-  saveMembers();
+copyBtn.addEventListener('click',()=>{
+  let text='編號\t名字\t天數\t備註\t捐獻\t活躍\t貢獻\n';
+  members.forEach(m=>{
+    text+=`${m.num}\t${m.name}\t${m.days}\t${m.note}\t${m.donate}\t${m.active}\t${m.contribute}\n`;
+  });
+  navigator.clipboard.writeText(text);
+  alert('已複製到剪貼簿');
 });
 
-// 標題編輯儲存
-title.addEventListener('input', ()=> {
-  localStorage.setItem('title', title.textContent);
-});
-
-// 初始化範例成員
-if(members.length===0){
-  addRow();
-  addRow();
-  addRow();
-}
+// 初始化
+renderTable();
 </script>
-
 </body>
 </html>
