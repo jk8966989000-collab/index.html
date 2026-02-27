@@ -50,8 +50,33 @@ const tableBody = document.querySelector("#memberTable tbody");
 const incrementBtn = document.getElementById("incrementBtn");
 const resetBtn = document.getElementById("resetBtn");
 const copyBtn = document.getElementById("copyBtn");
+const titleInput = document.getElementById("titleInput");
 
-// 判斷是否已經+1
+// ---------- LocalStorage ----------
+
+// 讀取資料
+function loadData(){
+  const savedData = localStorage.getItem("checkinData");
+  if(savedData){
+    const obj = JSON.parse(savedData);
+    members = obj.members || [];
+    lastIncrementDate = obj.lastIncrementDate || null;
+    titleInput.value = obj.title || "打卡群管理";
+  }
+}
+
+// 儲存資料
+function saveData(){
+  const obj = {
+    members,
+    lastIncrementDate,
+    title: titleInput.value
+  };
+  localStorage.setItem("checkinData",JSON.stringify(obj));
+}
+
+// ---------- 主要功能 ----------
+
 function checkIncrementStatus() {
   const today = new Date().toDateString();
   if(lastIncrementDate === today){
@@ -76,6 +101,7 @@ function addMember(name="") {
   };
   members.push(member);
   renderTable();
+  saveData();
 }
 
 // 更新表格
@@ -98,27 +124,36 @@ function renderTable() {
     tableBody.appendChild(tr);
 
     // 事件：名字
-    tr.children[1].querySelector("input").addEventListener("input",(e)=>{m.name=e.target.value;});
+    tr.children[1].querySelector("input").addEventListener("input",(e)=>{
+      m.name=e.target.value; saveData();
+    });
     // 天數
-    tr.children[2].querySelector("input").addEventListener("input",(e)=>{m.days=parseInt(e.target.value)||0;});
+    tr.children[2].querySelector("input").addEventListener("input",(e)=>{
+      m.days=parseInt(e.target.value)||0; saveData();
+    });
     // 備註
-    tr.children[3].querySelector("input").addEventListener("input",(e)=>{m.note=e.target.value;});
+    tr.children[3].querySelector("input").addEventListener("input",(e)=>{
+      m.note=e.target.value; saveData();
+    });
     // 捐獻
     tr.children[4].querySelector("input").addEventListener("input",(e)=>{
       m.donation=parseInt(e.target.value)||0;
       m.contribution = m.donation + m.activity;
       tr.children[6].querySelector("input").value = m.contribution;
+      saveData();
     });
     // 活躍
     tr.children[5].querySelector("input").addEventListener("input",(e)=>{
       m.activity=parseInt(e.target.value)||0;
       m.contribution = m.donation + m.activity;
       tr.children[6].querySelector("input").value = m.contribution;
+      saveData();
     });
     // 刪除
     tr.querySelector(".deleteBtn").addEventListener("click",()=>{
       members.splice(index,1);
       renderTable();
+      saveData();
     });
 
     // 拖曳排序
@@ -129,6 +164,7 @@ function renderTable() {
     tr.addEventListener("dragend",(e)=>{
       tr.classList.remove("dragging");
       renderTable();
+      saveData();
     });
     tr.addEventListener("dragover",(e)=>{
       e.preventDefault();
@@ -139,6 +175,7 @@ function renderTable() {
         members.splice(currentIndex,0,members.splice(draggingIndex,1)[0]);
         e.dataTransfer.setData("text/plain",currentIndex);
         renderTable();
+        saveData();
       }
     });
   });
@@ -154,6 +191,7 @@ incrementBtn.addEventListener("click",()=>{
   lastIncrementDate = today;
   incrementBtn.disabled = true;
   renderTable();
+  saveData();
 });
 
 // 重置+1
@@ -167,6 +205,7 @@ resetBtn.addEventListener("click",()=>{
   lastIncrementDate = null;
   incrementBtn.disabled = false;
   renderTable();
+  saveData();
 });
 
 // 新增成員
@@ -184,12 +223,19 @@ copyBtn.addEventListener("click",()=>{
   navigator.clipboard.writeText(text).then(()=>alert("已複製到剪貼簿"));
 });
 
+// title修改即時儲存
+titleInput.addEventListener("input",()=>{ saveData(); });
+
 // 定時每日檢查00:00刷新
 setInterval(()=>{
   checkIncrementStatus();
 },60000);
 
+// 初始化
+loadData();
 renderTable();
+checkIncrementStatus();
+
 </script>
 </body>
 </html>
