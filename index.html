@@ -33,6 +33,7 @@
       <th>捐獻</th>
       <th>活躍</th>
       <th>貢獻</th>
+      <th>操作</th>
     </tr>
   </thead>
   <tbody></tbody>
@@ -44,10 +45,15 @@ const addBtn = document.getElementById('addBtn');
 const incrementBtn = document.getElementById('incrementBtn');
 const resetBtn = document.getElementById('resetBtn');
 const copyBtn = document.getElementById('copyBtn');
-const title = document.getElementById('title');
 
 let members = JSON.parse(localStorage.getItem('members') || '[]');
 let lastIncrement = localStorage.getItem('lastIncrement') || '';
+
+// 判斷今天日期
+function todayStr() {
+  const now = new Date();
+  return now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+}
 
 function saveMembers(){
   localStorage.setItem('members', JSON.stringify(members));
@@ -122,6 +128,17 @@ function renderTable(){
     contributeInput.value=m.contribute || 0;
     cellContribute.appendChild(contributeInput);
 
+    // 刪除
+    const cellDelete = row.insertCell();
+    const delBtn = document.createElement('button');
+    delBtn.textContent='刪除';
+    delBtn.addEventListener('click',()=>{
+      members.splice(idx,1);
+      saveMembers();
+      renderTable();
+    });
+    cellDelete.appendChild(delBtn);
+
     // 拖曳事件
     row.addEventListener('dragstart',(e)=>{row.classList.add('dragging'); e.dataTransfer.effectAllowed='move';});
     row.addEventListener('dragend',(e)=>{row.classList.remove('dragging'); members=[]; Array.from(table.rows).forEach(r=>{
@@ -138,8 +155,13 @@ function renderTable(){
       table.insertBefore(draggingRow,row.nextSibling);
     }});
   });
+
+  // +1 按鈕灰色狀態
+  if(lastIncrement===todayStr()) incrementBtn.disabled=true;
+  else incrementBtn.disabled=false;
 }
 
+// 新增成員
 addBtn.addEventListener('click',()=>{
   const newMember = {num:members.length+1,name:'',days:0,note:'',donate:0,active:0,contribute:0};
   members.push(newMember);
@@ -149,7 +171,7 @@ addBtn.addEventListener('click',()=>{
 
 // +1 按鈕
 incrementBtn.addEventListener('click',()=>{
-  const today = new Date().toISOString().slice(0,10);
+  const today = todayStr();
   if(lastIncrement===today) return;
   members.forEach(m=>{ m.days=(m.days||0)+1; });
   lastIncrement=today;
@@ -160,13 +182,13 @@ incrementBtn.addEventListener('click',()=>{
 
 // 重置+1
 resetBtn.addEventListener('click',()=>{
-  const today = new Date().toISOString().slice(0,10);
+  const today = todayStr();
   if(lastIncrement!==today) return; // 沒有今天+1的動作
   members.forEach(m=>{
     if(m.days>0) m.days-=1;
   });
-  incrementBtn.disabled=false;
   lastIncrement='';
+  incrementBtn.disabled=false;
   saveMembers();
   renderTable();
 });
